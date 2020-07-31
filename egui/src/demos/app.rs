@@ -144,6 +144,7 @@ impl app::App for DemoApp {
         self.ui(ui, web_location_hash);
     }
 
+    #[cfg(feature = "with_serde")]
     fn on_exit(&mut self, storage: &mut dyn app::Storage) {
         app::set_value(storage, app::APP_KEY, self);
     }
@@ -359,7 +360,7 @@ impl Default for Widgets {
             button_enabled: true,
             radio: 0,
             count: 0,
-            slider_value: 3.14,
+            slider_value: 3.4,
             single_line_text_input: "Hello World!".to_owned(),
             multiline_text_input: "Text can both be so wide that it needs a linebreak, but you can also add manual linebreak by pressing enter, creating new paragraphs.\nThis is the start of the next paragraph.\n\nClick me to edit me!".to_owned(),
         }
@@ -468,7 +469,7 @@ impl BoxPainting {
                 outline: Some(LineStyle::new(self.stroke_width, gray(255, 255))),
             });
         }
-        ui.add_paint_cmds(cmds);
+        ui.painter().extend(cmds);
     }
 }
 
@@ -497,7 +498,8 @@ impl Painting {
         let rect = ui.allocate_space(ui.available_finite().size());
         let interact = ui.interact(rect, ui.id(), Sense::drag());
         let rect = interact.rect;
-        ui.set_clip_rect(ui.clip_rect().intersect(rect)); // Make sure we don't paint out of bounds
+        let clip_rect = ui.clip_rect().intersect(rect); // Make sure we don't paint out of bounds
+        let painter = Painter::new(ui.ctx().clone(), ui.layer(), clip_rect);
 
         if self.lines.is_empty() {
             self.lines.push(vec![]);
@@ -519,7 +521,7 @@ impl Painting {
         for line in &self.lines {
             if line.len() >= 2 {
                 let points: Vec<Pos2> = line.iter().map(|p| rect.min + *p).collect();
-                ui.add_paint_cmd(PaintCmd::Path {
+                painter.add(PaintCmd::Path {
                     path: Path::from_open_points(&points),
                     closed: false,
                     outline: Some(LineStyle::new(2.0, LIGHT_GRAY)),

@@ -97,7 +97,18 @@ impl<'t> Widget for TextEdit<'t> {
                         ui.ctx().output().copied_text = text.clone();
                     }
                     Event::Text(text_to_insert) => {
-                        insert_text(&mut cursor, text, text_to_insert);
+                        // newlines are handled by `Key::Enter`.
+                        if text_to_insert != "\n" && text_to_insert != "\r" {
+                            insert_text(&mut cursor, text, text_to_insert);
+                        }
+                    }
+                    Event::Key {
+                        key: Key::Enter,
+                        pressed: true,
+                    } => {
+                        if multiline {
+                            insert_text(&mut cursor, text, "\n");
+                        }
                     }
                     Event::Key { key, pressed: true } => {
                         on_key_press(&mut cursor, text, *key);
@@ -118,9 +129,11 @@ impl<'t> Widget for TextEdit<'t> {
             // dbg!(&galley);
         }
 
+        let painter = ui.painter();
+
         {
             let bg_rect = interact.rect.expand(2.0); // breathing room for content
-            ui.add_paint_cmd(PaintCmd::Rect {
+            painter.add(PaintCmd::Rect {
                 rect: bg_rect,
                 corner_radius: ui.style().interact.style(&interact).corner_radius,
                 fill: Some(ui.style().dark_bg_color),
@@ -135,7 +148,7 @@ impl<'t> Widget for TextEdit<'t> {
             if show_cursor {
                 if let Some(cursor) = state.cursor {
                     let cursor_pos = interact.rect.min + galley.char_start_pos(cursor);
-                    ui.add_paint_cmd(PaintCmd::line_segment(
+                    painter.add(PaintCmd::line_segment(
                         [cursor_pos, cursor_pos + vec2(0.0, line_spacing)],
                         color::WHITE,
                         ui.style().text_cursor_width,
@@ -145,7 +158,8 @@ impl<'t> Widget for TextEdit<'t> {
             ui.ctx().request_repaint(); // TODO: only when cursor blinks on or off
         }
 
-        ui.add_galley(interact.rect.min, galley, text_style, text_color);
+        let text_color = text_color.unwrap_or_else(|| ui.style().text_color);
+        painter.add_galley(interact.rect.min, galley, text_style, text_color);
         ui.memory().text_edit.insert(id, state);
         interact
     }
@@ -190,6 +204,7 @@ fn on_key_press(cursor: &mut usize, text: &mut String, key: Key) {
             new_text.extend(char_it.skip(1));
             *text = new_text;
         }
+        Key::Enter => {} // handled earlier
         Key::Home => {
             // To start of paragraph:
             let pos = line_col_from_char_idx(text, *cursor);

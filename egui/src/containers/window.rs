@@ -171,16 +171,24 @@ impl<'open> Window<'open> {
             let title_bar_height =
                 title_label.font_height(ctx.fonts()) + 1.0 * ctx.style().item_spacing.y; // this could be better
             let margins = 2.0 * frame.margin + vec2(0.0, title_bar_height);
-            interact(
+
+            window_interaction(
                 ctx,
-                margins,
                 possible,
                 area_layer,
-                area.state_mut(),
-                window_id,
-                resize_id,
+                window_id.with("frame_resize"),
                 last_frame_outer_rect,
             )
+            .and_then(|window_interaction| {
+                interact(
+                    window_interaction,
+                    ctx,
+                    margins,
+                    area_layer,
+                    area.state_mut(),
+                    resize_id,
+                )
+            })
         } else {
             None
         };
@@ -301,22 +309,13 @@ impl WindowInteraction {
 }
 
 fn interact(
+    window_interaction: WindowInteraction,
     ctx: &Context,
     margins: Vec2,
-    possible: PossibleInteractions,
     area_layer: Layer,
     area_state: &mut area::State,
-    window_id: Id,
     resize_id: Id,
-    rect: Rect,
 ) -> Option<WindowInteraction> {
-    let window_interaction = window_interaction(
-        ctx,
-        possible,
-        area_layer,
-        window_id.with("frame_resize"),
-        rect,
-    )?;
     let new_rect = resize_window(ctx, &window_interaction)?;
 
     let new_rect = ctx.round_rect_to_pixels(new_rect);
@@ -512,7 +511,7 @@ fn paint_frame_interaction(
         path.add_circle_quadrant(pos2(max.x - cr, min.y + cr), cr, 3.0);
         path.add_line_segment([pos2(max.x, min.y + cr), pos2(max.x, max.y - cr)]);
     }
-    ui.add_paint_cmd(PaintCmd::Path {
+    ui.painter().add(PaintCmd::Path {
         path,
         closed: false,
         fill: None,
@@ -615,7 +614,7 @@ impl TitleBar {
             let left = outer_rect.left();
             let right = outer_rect.right();
             let y = content_rect.top() + ui.style().item_spacing.y * 0.5;
-            ui.add_paint_cmd(PaintCmd::LineSegment {
+            ui.painter().add(PaintCmd::LineSegment {
                 points: [pos2(left, y), pos2(right, y)],
                 style: ui.style().interact.inactive.rect_outline.unwrap(),
             });
@@ -651,12 +650,12 @@ fn close_button(ui: &mut Ui, rect: Rect) -> InteractInfo {
 
     let stroke_color = ui.style().interact(&interact).stroke_color;
     let stroke_width = ui.style().interact(&interact).stroke_width;
-    ui.add_paint_cmd(PaintCmd::line_segment(
+    ui.painter().add(PaintCmd::line_segment(
         [rect.left_top(), rect.right_bottom()],
         stroke_color,
         stroke_width,
     ));
-    ui.add_paint_cmd(PaintCmd::line_segment(
+    ui.painter().add(PaintCmd::line_segment(
         [rect.right_top(), rect.left_bottom()],
         stroke_color,
         stroke_width,

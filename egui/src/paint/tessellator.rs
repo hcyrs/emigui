@@ -1,4 +1,5 @@
-/// Outputs render info in a format suitable for e.g. OpenGL.
+#![allow(clippy::identity_op)]
+
 use {
     super::{
         color::{self, srgba, Color},
@@ -563,6 +564,7 @@ pub fn tessellate_paint_command(
     path.clear();
 
     match command {
+        PaintCmd::Noop => {}
         PaintCmd::Circle {
             center,
             fill,
